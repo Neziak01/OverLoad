@@ -14,18 +14,13 @@ export default function MusculationPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
 
-  useEffect(() => {
-    fetchActivities();
-  }, []);
+  useEffect(() => { fetchActivities(); }, []);
 
   const fetchActivities = async () => {
     try {
-      const response = await fetch('/api/musculation');
-      if (!response.ok) {
-        throw new Error('Erreur lors du chargement des activités');
-      }
-      const data = await response.json();
-      setActivities(data);
+      const res = await fetch('/api/musculation');
+      if (!res.ok) throw new Error('Erreur lors du chargement');
+      setActivities(await res.json());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Une erreur est survenue');
     } finally {
@@ -35,21 +30,15 @@ export default function MusculationPage() {
 
   const handleSubmit = async (activity: Omit<MusculationActivity, '_id'>) => {
     try {
-      const response = await fetch('/api/musculation', {
+      const res = await fetch('/api/musculation', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(activity),
       });
-
-      if (!response.ok) {
-        throw new Error("Erreur lors de l'ajout de l'activité");
-      }
-
-      const newActivity = await response.json();
+      if (!res.ok) throw new Error("Erreur lors de l'ajout");
+      const newActivity = await res.json();
       setActivities(prev => [newActivity, ...prev]);
-      setCurrentPage(1); // Retour à la première page après l'ajout
+      setCurrentPage(1);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Une erreur est survenue');
     }
@@ -57,62 +46,86 @@ export default function MusculationPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      const response = await fetch(`/api/musculation/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error("Erreur lors de la suppression de l'activité");
-      }
-
-      setActivities(prev => prev.filter(activity => activity._id !== id));
-      // Ajuster la page courante si nécessaire
-      const totalPages = Math.ceil((activities.length - 1) / ITEMS_PER_PAGE);
-      if (currentPage > totalPages) {
-        setCurrentPage(totalPages);
-      }
+      const res = await fetch(`/api/musculation/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Erreur lors de la suppression');
+      setActivities(prev => prev.filter(a => a._id !== id));
+      const newTotal = activities.length - 1;
+      const newTotalPages = Math.ceil(newTotal / ITEMS_PER_PAGE);
+      if (currentPage > newTotalPages) setCurrentPage(Math.max(1, newTotalPages));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Une erreur est survenue');
     }
   };
 
-  // Calcul de la pagination
   const totalPages = Math.ceil(activities.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedActivities = activities.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const paginatedActivities = activities.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="md:ml-[72px] min-h-screen bg-slate-50 flex items-center justify-center pb-[76px] md:pb-0">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+          <p className="text-sm text-gray-500">Chargement...</p>
+        </div>
       </div>
     );
   }
 
-  if (error) {
-    return <div className="text-center py-8 text-red-600">{error}</div>;
-  }
-
   return (
-    <div className="container mx-auto px-4 py-8 md:ml-20 mt-30 pr-30">
-      <h1 className="text-3xl font-bold mb-8">Mes séances de musculation</h1>
+    <div className="md:ml-[72px] min-h-screen bg-slate-50 pb-[76px] md:pb-0">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-10">
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div>
-          <h2 className="text-xl font-semibold mb-4">Ajouter une séance</h2>
-          <MusculationActivityForm onSubmit={handleSubmit} />
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-8">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center">
+            <svg className="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" strokeLinecap="round">
+              <path d="M7 12h10" />
+              <path d="M5 9.5v5M19 9.5v5" />
+              <path d="M3 10.5v3M21 10.5v3" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Musculation</h1>
+            <p className="text-sm text-gray-500">
+              {activities.length} séance{activities.length !== 1 ? 's' : ''} enregistrée{activities.length !== 1 ? 's' : ''}
+            </p>
+          </div>
         </div>
 
-        <div>
-          <h2 className="text-xl font-semibold mb-4">Mes séances</h2>
-          <MusculationActivityList activities={paginatedActivities} onDelete={handleDelete} />
-          {totalPages > 1 && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-            />
-          )}
+        {error && (
+          <div className="mb-6 flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+            {error}
+          </div>
+        )}
+
+        {/* Two column grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Form */}
+          <div>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <h2 className="text-base font-semibold text-gray-900 mb-5">Nouvelle séance</h2>
+              <MusculationActivityForm onSubmit={handleSubmit} />
+            </div>
+          </div>
+
+          {/* List */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-semibold text-gray-900">Historique</h2>
+              {activities.length > 0 && (
+                <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-2.5 py-1 font-medium">
+                  {activities.length} séance{activities.length !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+            <MusculationActivityList activities={paginatedActivities} onDelete={handleDelete} />
+            {totalPages > 1 && (
+              <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} accentColor="emerald" />
+            )}
+          </div>
         </div>
       </div>
     </div>

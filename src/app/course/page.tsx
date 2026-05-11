@@ -6,121 +6,123 @@ import CourseActivityList from '@/components/course/CourseActivityList';
 import Pagination from '@/components/Pagination';
 import { CourseActivity } from '@/types/course';
 
-type CreateCourseActivity = Omit<CourseActivity, '_id'>;
-
 const ITEMS_PER_PAGE = 5;
 
 export default function CoursePage() {
   const [activities, setActivities] = useState<CourseActivity[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
 
+  useEffect(() => { fetchActivities(); }, []);
+
   const fetchActivities = async () => {
     try {
-      const response = await fetch('/api/course');
-      if (!response.ok) throw new Error('Erreur lors du chargement des courses');
-      const data = await response.json();
-      setActivities(data);
+      const res = await fetch('/api/course');
+      if (!res.ok) throw new Error('Erreur lors du chargement');
+      setActivities(await res.json());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Une erreur est survenue');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchActivities();
-  }, []);
-
-  const handleAddActivity = async (activity: CreateCourseActivity) => {
+  const handleSubmit = async (activity: Omit<CourseActivity, '_id'>) => {
     try {
-      const response = await fetch('/api/course', {
+      const res = await fetch('/api/course', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(activity),
       });
-
-      if (!response.ok) throw new Error("Erreur lors de l'ajout de la course");
-
-      const newActivity = await response.json();
+      if (!res.ok) throw new Error("Erreur lors de l'ajout");
+      const newActivity = await res.json();
       setActivities(prev => [newActivity, ...prev]);
-      setCurrentPage(1); // Retour à la première page après l'ajout
+      setCurrentPage(1);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Une erreur est survenue');
     }
   };
 
-  const handleDeleteActivity = async (id: string) => {
+  const handleDelete = async (id: string) => {
     try {
-      const response = await fetch(`/api/course/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) throw new Error('Erreur lors de la suppression de la course');
-
-      setActivities(prev => prev.filter(activity => activity._id !== id));
-      // Ajuster la page courante si nécessaire
-      const totalPages = Math.ceil((activities.length - 1) / ITEMS_PER_PAGE);
-      if (currentPage > totalPages) {
-        setCurrentPage(totalPages);
-      }
+      const res = await fetch(`/api/course/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Erreur lors de la suppression');
+      setActivities(prev => prev.filter(a => a._id !== id));
+      const newTotalPages = Math.ceil((activities.length - 1) / ITEMS_PER_PAGE);
+      if (currentPage > newTotalPages) setCurrentPage(Math.max(1, newTotalPages));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Une erreur est survenue');
     }
   };
 
-  // Calcul de la pagination
   const totalPages = Math.ceil(activities.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedActivities = activities.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const paginatedActivities = activities.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8 md:ml-20 mt-30">
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="container mx-auto px-4 py-8 md:ml-20 mt-30">
-        <div
-          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"
-          role="alert"
-        >
-          <strong className="font-bold">Erreur !</strong>
-          <span className="block sm:inline"> {error}</span>
+      <div className="md:ml-[72px] min-h-screen bg-slate-50 flex items-center justify-center pb-[76px] md:pb-0">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-full border-2 border-violet-500 border-t-transparent animate-spin" />
+          <p className="text-sm text-gray-500">Chargement...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 md:ml-20 mt-30 pr-30">
-      <h1 className="text-3xl font-bold mb-8">Mes Courses</h1>
+    <div className="md:ml-[72px] min-h-screen bg-slate-50 pb-[76px] md:pb-0">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-10">
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div>
-          <h2 className="text-xl font-semibold mb-4">Ajouter une course</h2>
-          <CourseActivityForm onSubmit={handleAddActivity} />
+        <div className="flex items-center gap-4 mb-8">
+          <div className="w-12 h-12 rounded-2xl bg-violet-100 flex items-center justify-center">
+            <svg className="w-6 h-6 text-violet-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="13" cy="4.5" r="1.5" />
+              <path d="M8.5 17.5l2-5 2.5 2 2-3.5" />
+              <path d="M16 10.5l1.5 4" />
+              <path d="M8.5 17.5l-1 3.5M14.5 19l-1-4.5" />
+              <path d="M10.5 12.5L9 16h5" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Course à pied</h1>
+            <p className="text-sm text-gray-500">
+              {activities.length} sortie{activities.length !== 1 ? 's' : ''} enregistrée{activities.length !== 1 ? 's' : ''}
+            </p>
+          </div>
         </div>
 
-        <div>
-          <h2 className="text-xl font-semibold mb-4">Mes courses</h2>
-          <CourseActivityList activities={paginatedActivities} onDelete={handleDeleteActivity} />
-          {totalPages > 1 && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-            />
-          )}
+        {error && (
+          <div className="mb-6 flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+            {error}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <h2 className="text-base font-semibold text-gray-900 mb-5">Nouvelle sortie</h2>
+              <CourseActivityForm onSubmit={handleSubmit} />
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-semibold text-gray-900">Historique</h2>
+              {activities.length > 0 && (
+                <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-2.5 py-1 font-medium">
+                  {activities.length} sortie{activities.length !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+            <CourseActivityList activities={paginatedActivities} onDelete={handleDelete} />
+            {totalPages > 1 && (
+              <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} accentColor="violet" />
+            )}
+          </div>
         </div>
       </div>
     </div>
