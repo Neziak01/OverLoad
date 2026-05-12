@@ -13,7 +13,7 @@
     "animejs": "^4.0.2",
     "framer-motion": "^12.12.2",
     "mongoose": "^8.15.0",
-    "next": "^15.2.3",
+    "next": "15.2.8",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "uuid": "^11.1.0"
