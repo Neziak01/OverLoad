@@ -4,14 +4,16 @@ import { MusculationActivity } from '@/types/musculation';
 import { PadelActivity } from '@/types/padel';
 import { CourseActivity } from '@/types/course';
 import { NatationActivity } from '@/types/natation';
+import { Sport, GenericActivity } from '@/types/sport';
 
 interface CalendarProps {
   onDateSelect: (date: Date) => void;
 }
 
 interface ActivityDetails {
-  type: 'musculation' | 'padel' | 'course' | 'natation';
-  activity: MusculationActivity | PadelActivity | CourseActivity | NatationActivity;
+  type: 'musculation' | 'padel' | 'course' | 'natation' | 'generic';
+  activity: MusculationActivity | PadelActivity | CourseActivity | NatationActivity | GenericActivity;
+  sport?: Sport;
 }
 
 const MONTHS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
@@ -31,6 +33,8 @@ export default function Calendar({ onDateSelect }: CalendarProps) {
   const [padelActivities, setPadelActivities] = useState<PadelActivity[]>([]);
   const [courseActivities, setCourseActivities] = useState<CourseActivity[]>([]);
   const [natationActivities, setNatationActivities] = useState<NatationActivity[]>([]);
+  const [genericActivities, setGenericActivities] = useState<GenericActivity[]>([]);
+  const [customSports, setCustomSports] = useState<Sport[]>([]);
   const [selectedActivity, setSelectedActivity] = useState<ActivityDetails | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -40,22 +44,28 @@ export default function Calendar({ onDateSelect }: CalendarProps) {
 
   const fetchAllActivities = async () => {
     try {
-      const [musRes, padRes, courRes, natRes] = await Promise.all([
+      const [musRes, padRes, courRes, natRes, sportsRes, genRes] = await Promise.all([
         fetch('/api/musculation'),
         fetch('/api/padel'),
         fetch('/api/course'),
         fetch('/api/natation'),
+        fetch('/api/sports'),
+        fetch('/api/generic-activities'),
       ]);
-      const [musData, padData, courData, natData] = await Promise.all([
+      const [musData, padData, courData, natData, sportsData, genData] = await Promise.all([
         musRes.ok ? musRes.json() : [],
         padRes.ok ? padRes.json() : [],
         courRes.ok ? courRes.json() : [],
         natRes.ok ? natRes.json() : [],
+        sportsRes.ok ? sportsRes.json() : [],
+        genRes.ok ? genRes.json() : [],
       ]);
       setMusculationActivities(Array.isArray(musData) ? musData : []);
       setPadelActivities(Array.isArray(padData) ? padData : []);
       setCourseActivities(Array.isArray(courData) ? courData : []);
       setNatationActivities(Array.isArray(natData) ? natData : []);
+      setCustomSports(Array.isArray(sportsData) ? sportsData : []);
+      setGenericActivities(Array.isArray(genData) ? genData : []);
     } catch (err) {
       console.error('Erreur chargement activités:', err);
     } finally {
@@ -86,7 +96,7 @@ export default function Calendar({ onDateSelect }: CalendarProps) {
   const renderActivityDetails = () => {
     if (!selectedActivity) return null;
     const { type, activity } = selectedActivity;
-    const config = SPORT_CONFIG[type];
+    const config = SPORT_CONFIG[type as keyof typeof SPORT_CONFIG] ?? { label: '', bg: '', text: '', dot: '' };
 
     const renderContent = () => {
       if (type === 'musculation') {
@@ -166,15 +176,44 @@ export default function Calendar({ onDateSelect }: CalendarProps) {
           </>
         );
       }
+      if (type === 'generic' && selectedActivity?.sport) {
+        const a = activity as GenericActivity;
+        const s = selectedActivity.sport;
+        return (
+          <>
+            <h3 className="text-base font-semibold text-gray-900 mb-3">
+              {s.emoji} {s.name}
+            </h3>
+            <div className="space-y-2">
+              {a.duration && (
+                <div className="flex items-center justify-between rounded-xl px-3 py-2" style={{ backgroundColor: `${s.color}15` }}>
+                  <span className="text-sm font-medium text-gray-700">Durée</span>
+                  <span className="text-sm font-semibold" style={{ color: s.color }}>{a.duration} min</span>
+                </div>
+              )}
+            </div>
+            {a.notes && <p className="mt-3 text-xs text-gray-500">{a.notes}</p>}
+          </>
+        );
+      }
     };
+
+    const isGeneric = type === 'generic' && selectedActivity?.sport;
+    const genericSport = selectedActivity?.sport;
 
     return (
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl max-h-[80vh] overflow-y-auto">
           <div className="flex items-center justify-between p-5 border-b border-gray-100">
+            {isGeneric && genericSport ? (
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ backgroundColor: `${genericSport.color}20`, color: genericSport.color }}>
+                {genericSport.emoji} {genericSport.name}
+              </span>
+            ) : (
             <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${config.bg} ${config.text}`}>
               {config.label}
             </span>
+            )}
             <button
               onClick={() => setSelectedActivity(null)}
               className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
@@ -210,6 +249,7 @@ export default function Calendar({ onDateSelect }: CalendarProps) {
       const dayPadel = padelActivities.filter(a => formatDateKey(new Date(a.date)) === dateKey);
       const dayCourse = courseActivities.filter(a => formatDateKey(new Date(a.date)) === dateKey);
       const dayNatation = natationActivities.filter(a => formatDateKey(new Date(a.date)) === dateKey);
+      const dayGeneric = genericActivities.filter(a => formatDateKey(new Date(a.date)) === dateKey);
 
       const todayStyle = isToday(day);
       const selectedStyle = isSelected(day);
@@ -268,6 +308,20 @@ export default function Calendar({ onDateSelect }: CalendarProps) {
                 Natation
               </button>
             ))}
+            {dayGeneric.map(a => {
+              const sport = customSports.find(s => s.slug === a.sportSlug);
+              if (!sport) return null;
+              return (
+                <button
+                  key={a._id}
+                  onClick={e => { e.stopPropagation(); setSelectedActivity({ type: 'generic', activity: a, sport }); }}
+                  className="w-full text-left rounded px-1.5 py-0.5 text-[10px] font-medium truncate transition-colors block"
+                  style={{ backgroundColor: `${sport.color}20`, color: sport.color }}
+                >
+                  {sport.emoji} {sport.name}
+                </button>
+              );
+            })}
           </div>
         </div>
       );
@@ -344,6 +398,12 @@ export default function Calendar({ onDateSelect }: CalendarProps) {
           <div key={key} className="flex items-center gap-1.5">
             <div className={`w-2 h-2 rounded-full ${cfg.dot}`} />
             <span className="text-xs text-gray-500">{cfg.label}</span>
+          </div>
+        ))}
+        {customSports.map(sport => (
+          <div key={sport._id} className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: sport.color }} />
+            <span className="text-xs text-gray-500">{sport.name}</span>
           </div>
         ))}
       </div>
