@@ -4,15 +4,27 @@ import { MusculationActivity } from '@/types/musculation';
 import { PadelActivity } from '@/types/padel';
 import { CourseActivity } from '@/types/course';
 import { NatationActivity } from '@/types/natation';
+import { Sport, GenericActivity } from '@/types/sport';
 
 interface CalendarProps {
   onDateSelect: (date: Date) => void;
 }
 
 interface ActivityDetails {
-  type: 'musculation' | 'padel' | 'course' | 'natation';
-  activity: MusculationActivity | PadelActivity | CourseActivity | NatationActivity;
+  type: 'musculation' | 'padel' | 'course' | 'natation' | 'generic';
+  activity: MusculationActivity | PadelActivity | CourseActivity | NatationActivity | GenericActivity;
+  sport?: Sport;
 }
+
+const MONTHS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+const DAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+
+const SPORT_CONFIG = {
+  musculation: { label: 'Muscu', bg: 'bg-emerald-100', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+  padel: { label: 'Padel', bg: 'bg-amber-100', text: 'text-amber-700', dot: 'bg-amber-500' },
+  course: { label: 'Course', bg: 'bg-violet-100', text: 'text-violet-700', dot: 'bg-violet-500' },
+  natation: { label: 'Natation', bg: 'bg-sky-100', text: 'text-sky-700', dot: 'bg-sky-500' },
+};
 
 export default function Calendar({ onDateSelect }: CalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -21,22 +33,10 @@ export default function Calendar({ onDateSelect }: CalendarProps) {
   const [padelActivities, setPadelActivities] = useState<PadelActivity[]>([]);
   const [courseActivities, setCourseActivities] = useState<CourseActivity[]>([]);
   const [natationActivities, setNatationActivities] = useState<NatationActivity[]>([]);
+  const [genericActivities, setGenericActivities] = useState<GenericActivity[]>([]);
+  const [customSports, setCustomSports] = useState<Sport[]>([]);
   const [selectedActivity, setSelectedActivity] = useState<ActivityDetails | null>(null);
-
-  const months = [
-    'Janvier',
-    'Février',
-    'Mars',
-    'Avril',
-    'Mai',
-    'Juin',
-    'Juillet',
-    'Août',
-    'Septembre',
-    'Octobre',
-    'Novembre',
-    'Décembre',
-  ];
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchAllActivities();
@@ -44,38 +44,37 @@ export default function Calendar({ onDateSelect }: CalendarProps) {
 
   const fetchAllActivities = async () => {
     try {
-      const [musculationRes, padelRes, courseRes, natationRes] = await Promise.all([
+      const [musRes, padRes, courRes, natRes, sportsRes, genRes] = await Promise.all([
         fetch('/api/musculation'),
         fetch('/api/padel'),
         fetch('/api/course'),
         fetch('/api/natation'),
+        fetch('/api/sports'),
+        fetch('/api/generic-activities'),
       ]);
-
-      if (!musculationRes.ok || !padelRes.ok || !courseRes.ok || !natationRes.ok) {
-        throw new Error('Erreur lors du chargement des activités');
-      }
-
-      const [musculationData, padelData, courseData, natationData] = await Promise.all([
-        musculationRes.json(),
-        padelRes.json(),
-        courseRes.json(),
-        natationRes.json(),
+      const [musData, padData, courData, natData, sportsData, genData] = await Promise.all([
+        musRes.ok ? musRes.json() : [],
+        padRes.ok ? padRes.json() : [],
+        courRes.ok ? courRes.json() : [],
+        natRes.ok ? natRes.json() : [],
+        sportsRes.ok ? sportsRes.json() : [],
+        genRes.ok ? genRes.json() : [],
       ]);
-
-      setMusculationActivities(musculationData);
-      setPadelActivities(padelData);
-      setCourseActivities(courseData);
-      setNatationActivities(natationData);
+      setMusculationActivities(Array.isArray(musData) ? musData : []);
+      setPadelActivities(Array.isArray(padData) ? padData : []);
+      setCourseActivities(Array.isArray(courData) ? courData : []);
+      setNatationActivities(Array.isArray(natData) ? natData : []);
+      setCustomSports(Array.isArray(sportsData) ? sportsData : []);
+      setGenericActivities(Array.isArray(genData) ? genData : []);
     } catch (err) {
-      console.error('Erreur:', err);
+      console.error('Erreur chargement activités:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const formatDateKey = (date: Date) => {
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
-      date.getDate()
-    ).padStart(2, '0')}`;
-  };
+  const formatDateKey = (date: Date) =>
+    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
   const handleDateClick = (day: number) => {
     const newDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
@@ -83,160 +82,148 @@ export default function Calendar({ onDateSelect }: CalendarProps) {
     onDateSelect(newDate);
   };
 
-  const handleActivityClick = (type: ActivityDetails['type'], activity: any) => {
-    setSelectedActivity({ type, activity });
-  };
+  const today = new Date();
+  const isToday = (day: number) =>
+    day === today.getDate() &&
+    currentDate.getMonth() === today.getMonth() &&
+    currentDate.getFullYear() === today.getFullYear();
 
-  const handleClosePopup = () => {
-    setSelectedActivity(null);
-  };
-
-  const handlePrevMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1));
-  };
-
-  const handleNextMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1));
-  };
-
-  const handleYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newYear = parseInt(e.target.value);
-    setCurrentDate(new Date(newYear, currentDate.getMonth()));
-  };
+  const isSelected = (day: number) =>
+    selectedDate?.getDate() === day &&
+    selectedDate?.getMonth() === currentDate.getMonth() &&
+    selectedDate?.getFullYear() === currentDate.getFullYear();
 
   const renderActivityDetails = () => {
     if (!selectedActivity) return null;
-
     const { type, activity } = selectedActivity;
+    const config = SPORT_CONFIG[type as keyof typeof SPORT_CONFIG] ?? { label: '', bg: '', text: '', dot: '' };
 
-    // Temporarily prevent rendering the overlay to debug black screen issue
-    return null; // Comment out or remove this line if the Calendar overlay is not the issue
-
-    const renderMusculationDetails = (activity: MusculationActivity) => (
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold">Séance de musculation</h3>
-        <div className="space-y-2">
-          {activity.exercices.map((exercice, index) => (
-            <div
-              key={`${activity._id}-exercice-${exercice.nom}-${index}`}
-              className="bg-gray-50 p-3 rounded-lg"
-            >
-              <p className="font-medium">{exercice.nom}</p>
-              <div className="mt-2 space-y-1">
-                {exercice.series.map((serie, serieIndex) => (
-                  <p
-                    key={`${activity._id}-serie-${exercice.nom}-${serieIndex}`}
-                    className="text-sm text-gray-600"
-                  >
-                    Série {serieIndex + 1}: {serie.repetitions} répétitions
-                    {serie.poids ? ` - ${serie.poids}kg` : ''}
-                  </p>
-                ))}
+    const renderContent = () => {
+      if (type === 'musculation') {
+        const a = activity as MusculationActivity;
+        return (
+          <>
+            <h3 className="text-base font-semibold text-gray-900 mb-3">Séance musculation</h3>
+            <div className="space-y-2">
+              {a.exercices.map((ex, i) => (
+                <div key={i} className="bg-gray-50 rounded-xl p-3">
+                  <p className="font-medium text-sm text-gray-800">{ex.nom}</p>
+                  <div className="mt-1 space-y-0.5">
+                    {ex.series.map((s, j) => (
+                      <p key={j} className="text-xs text-gray-500">
+                        Série {j + 1}: {s.repetitions} reps{s.poids ? ` — ${s.poids} kg` : ''}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {a.notes && <p className="mt-3 text-xs text-gray-500">{a.notes}</p>}
+          </>
+        );
+      }
+      if (type === 'padel') {
+        const a = activity as PadelActivity;
+        return (
+          <>
+            <h3 className="text-base font-semibold text-gray-900 mb-3">
+              {a.type === 'training' ? 'Entraînement' : 'Tournoi'} Padel
+            </h3>
+            <div className="space-y-1.5 text-sm text-gray-600">
+              <p><span className="font-medium text-gray-800">Lieu</span> — {a.location}</p>
+              <p><span className="font-medium text-gray-800">Durée</span> — {a.duration} min</p>
+              {a.level && <p><span className="font-medium text-gray-800">Niveau</span> — {a.level}</p>}
+              {a.score && <p><span className="font-medium text-gray-800">Score</span> — {a.score}</p>}
+              {a.result && <p><span className="font-medium text-gray-800">Résultat</span> — {a.result}</p>}
+            </div>
+            {a.notes && <p className="mt-3 text-xs text-gray-500">{a.notes}</p>}
+          </>
+        );
+      }
+      if (type === 'course') {
+        const a = activity as CourseActivity;
+        return (
+          <>
+            <h3 className="text-base font-semibold text-gray-900 mb-3">Course à pied</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-violet-50 rounded-xl p-3 text-center">
+                <p className="text-xl font-bold text-violet-600">{a.distance}</p>
+                <p className="text-xs text-gray-500 mt-0.5">kilomètres</p>
+              </div>
+              <div className="bg-violet-50 rounded-xl p-3 text-center">
+                <p className="text-xl font-bold text-violet-600">{a.duree}</p>
+                <p className="text-xs text-gray-500 mt-0.5">minutes</p>
               </div>
             </div>
-          ))}
-        </div>
-        {activity.notes && (
-          <div className="mt-4">
-            <p className="text-sm text-gray-600">{activity.notes}</p>
-          </div>
-        )}
-      </div>
-    );
-
-    const renderPadelDetails = (activity: PadelActivity) => (
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold">
-          {activity.type === 'training' ? 'Entraînement' : 'Tournoi'} de Padel
-        </h3>
-        <div className="space-y-2">
-          <p>Lieu: {activity.location}</p>
-          <p>Durée: {activity.duration} minutes</p>
-          {activity.type === 'tournament' && (
-            <>
-              <p>Niveau: {activity.level}</p>
-              {activity.result && <p>Résultat: {activity.result}</p>}
-            </>
-          )}
-          {activity.type === 'training' && (
-            <>
-              {activity.score && <p>Score: {activity.score}</p>}
-              <p>Niveau: {activity.level}</p>
-            </>
-          )}
-        </div>
-        {activity.notes && (
-          <div className="mt-4">
-            <p className="text-sm text-gray-600">{activity.notes}</p>
-          </div>
-        )}
-      </div>
-    );
-
-    const renderCourseDetails = (activity: CourseActivity) => (
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold">Course</h3>
-        <div className="space-y-2">
-          <p>Distance: {activity.distance} km</p>
-          <p>Durée: {activity.duree} minutes</p>
-        </div>
-        {activity.notes && (
-          <div className="mt-4">
-            <p className="text-sm text-gray-600">{activity.notes}</p>
-          </div>
-        )}
-      </div>
-    );
-
-    const renderNatationDetails = (activity: NatationActivity) => (
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold">Séance de natation</h3>
-        <div className="space-y-2">
-          {activity.nages.map((nage, nageIndex) => (
-            <div
-              key={`${activity._id}-nage-${nage.type}-${nageIndex}`}
-              className="bg-gray-50 p-3 rounded-lg"
-            >
-              <p className="font-medium">{nage.type}</p>
-              {nage.distance && <p className="text-sm text-gray-600">Distance: {nage.distance}m</p>}
+            {a.notes && <p className="mt-3 text-xs text-gray-500">{a.notes}</p>}
+          </>
+        );
+      }
+      if (type === 'natation') {
+        const a = activity as NatationActivity;
+        return (
+          <>
+            <h3 className="text-base font-semibold text-gray-900 mb-3">Séance natation</h3>
+            <div className="space-y-2">
+              {a.nages.map((nage, i) => (
+                <div key={i} className="flex items-center justify-between bg-sky-50 rounded-xl px-3 py-2">
+                  <span className="text-sm font-medium text-gray-800 capitalize">{nage.type}</span>
+                  <span className="text-sm text-sky-600 font-semibold">{nage.distance} m</span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        {activity.notes && (
-          <div className="mt-4">
-            <p className="text-sm text-gray-600">{activity.notes}</p>
-          </div>
-        )}
-      </div>
-    );
+            {a.notes && <p className="mt-3 text-xs text-gray-500">{a.notes}</p>}
+          </>
+        );
+      }
+      if (type === 'generic' && selectedActivity?.sport) {
+        const a = activity as GenericActivity;
+        const s = selectedActivity.sport;
+        return (
+          <>
+            <h3 className="text-base font-semibold text-gray-900 mb-3">
+              {s.emoji} {s.name}
+            </h3>
+            <div className="space-y-2">
+              {a.duration && (
+                <div className="flex items-center justify-between rounded-xl px-3 py-2" style={{ backgroundColor: `${s.color}15` }}>
+                  <span className="text-sm font-medium text-gray-700">Durée</span>
+                  <span className="text-sm font-semibold" style={{ color: s.color }}>{a.duration} min</span>
+                </div>
+              )}
+            </div>
+            {a.notes && <p className="mt-3 text-xs text-gray-500">{a.notes}</p>}
+          </>
+        );
+      }
+    };
+
+    const isGeneric = type === 'generic' && selectedActivity?.sport;
+    const genericSport = selectedActivity?.sport;
 
     return (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-        <div className="bg-white p-8 rounded-2xl w-[480px] shadow-xl max-h-[80vh] overflow-y-auto">
-          <div className="flex justify-between items-start mb-6">
-            <div className="flex-1">
-              {type === 'musculation' && renderMusculationDetails(activity as MusculationActivity)}
-              {type === 'padel' && renderPadelDetails(activity as PadelActivity)}
-              {type === 'course' && renderCourseDetails(activity as CourseActivity)}
-              {type === 'natation' && renderNatationDetails(activity as NatationActivity)}
-            </div>
-            <button onClick={handleClosePopup} className="ml-4 text-gray-400 hover:text-gray-600">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl max-h-[80vh] overflow-y-auto">
+          <div className="flex items-center justify-between p-5 border-b border-gray-100">
+            {isGeneric && genericSport ? (
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ backgroundColor: `${genericSport.color}20`, color: genericSport.color }}>
+                {genericSport.emoji} {genericSport.name}
+              </span>
+            ) : (
+            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${config.bg} ${config.text}`}>
+              {config.label}
+            </span>
+            )}
+            <button
+              onClick={() => setSelectedActivity(null)}
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
+          <div className="p-5">{renderContent()}</div>
         </div>
       </div>
     );
@@ -247,104 +234,94 @@ export default function Calendar({ onDateSelect }: CalendarProps) {
     const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
     const lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
     const daysInMonth = lastDay.getDate();
-    const startingDay = firstDay.getDay();
+    // Convert Sunday=0 to Monday=0 (European style)
+    const startingDay = (firstDay.getDay() + 6) % 7;
 
-    // Add empty cells for days before the first day of the month
     for (let i = 0; i < startingDay; i++) {
-      days.push(
-        <div key={`empty-${i}`} className="h-28 w-28 border border-gray-100 p-2 bg-gray-50"></div>
-      );
+      days.push(<div key={`empty-${i}`} className="h-24 md:h-28 rounded-xl" />);
     }
 
-    // Add cells for each day of the month
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
       const dateKey = formatDateKey(date);
 
-      const musculationActivitiesForDay = musculationActivities.filter(
-        activity => formatDateKey(new Date(activity.date)) === dateKey
-      );
-      const padelActivitiesForDay = padelActivities.filter(
-        activity => formatDateKey(new Date(activity.date)) === dateKey
-      );
-      const courseActivitiesForDay = courseActivities.filter(
-        activity => formatDateKey(new Date(activity.date)) === dateKey
-      );
-      const natationActivitiesForDay = natationActivities.filter(
-        activity => formatDateKey(new Date(activity.date)) === dateKey
-      );
+      const dayMusculation = musculationActivities.filter(a => formatDateKey(new Date(a.date)) === dateKey);
+      const dayPadel = padelActivities.filter(a => formatDateKey(new Date(a.date)) === dateKey);
+      const dayCourse = courseActivities.filter(a => formatDateKey(new Date(a.date)) === dateKey);
+      const dayNatation = natationActivities.filter(a => formatDateKey(new Date(a.date)) === dateKey);
+      const dayGeneric = genericActivities.filter(a => formatDateKey(new Date(a.date)) === dateKey);
 
-      const isSelected =
-        selectedDate?.getDate() === day &&
-        selectedDate?.getMonth() === currentDate.getMonth() &&
-        selectedDate?.getFullYear() === currentDate.getFullYear();
-      const isToday =
-        day === new Date().getDate() &&
-        currentDate.getMonth() === new Date().getMonth() &&
-        currentDate.getFullYear() === new Date().getFullYear();
+      const todayStyle = isToday(day);
+      const selectedStyle = isSelected(day);
 
       days.push(
         <div
           key={day}
           onClick={() => handleDateClick(day)}
-          className={`h-28 w-28 border border-gray-100 p-2 cursor-pointer transition-all duration-200
-            ${isSelected ? 'bg-blue-50 ring-2 ring-blue-500' : 'hover:bg-gray-50'}
-            ${isToday ? 'bg-blue-50/50' : ''}`}
+          className={`h-24 md:h-28 rounded-xl p-2 cursor-pointer transition-all duration-150 border ${
+            selectedStyle
+              ? 'border-teal-400 bg-teal-50 ring-2 ring-teal-400/30'
+              : todayStyle
+              ? 'border-teal-200 bg-teal-50/60'
+              : 'border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm'
+          }`}
         >
-          <div
-            className={`text-sm font-medium mb-2 ${isToday ? 'text-blue-600' : 'text-gray-700'}`}
-          >
+          <div className={`text-xs font-semibold mb-1.5 w-6 h-6 flex items-center justify-center rounded-full ${
+            todayStyle ? 'bg-teal-500 text-white' : 'text-gray-600'
+          }`}>
             {day}
           </div>
-          <div className="space-y-1 max-h-[calc(100%-2rem)] overflow-y-auto">
-            {musculationActivitiesForDay.map(activity => (
-              <div
-                key={`musculation-${activity._id}-${dateKey}`}
-                onClick={e => {
-                  e.stopPropagation();
-                  handleActivityClick('musculation', activity);
-                }}
-                className="bg-green-100 text-green-800 rounded-md px-2 py-1 text-xs font-medium truncate hover:bg-green-200 transition-colors duration-200 cursor-pointer"
+          <div className="space-y-0.5 overflow-hidden">
+            {dayMusculation.map(a => (
+              <button
+                key={a._id}
+                onClick={e => { e.stopPropagation(); setSelectedActivity({ type: 'musculation', activity: a }); }}
+                className="w-full text-left bg-emerald-100 text-emerald-700 rounded px-1.5 py-0.5 text-[10px] font-medium truncate hover:bg-emerald-200 transition-colors block"
               >
-                Musculation
-              </div>
+                Muscu
+              </button>
             ))}
-            {padelActivitiesForDay.map(activity => (
-              <div
-                key={`padel-${activity._id}-${dateKey}`}
-                onClick={e => {
-                  e.stopPropagation();
-                  handleActivityClick('padel', activity);
-                }}
-                className="bg-blue-100 text-blue-800 rounded-md px-2 py-1 text-xs font-medium truncate hover:bg-blue-200 transition-colors duration-200 cursor-pointer"
+            {dayPadel.map(a => (
+              <button
+                key={a._id}
+                onClick={e => { e.stopPropagation(); setSelectedActivity({ type: 'padel', activity: a }); }}
+                className="w-full text-left bg-amber-100 text-amber-700 rounded px-1.5 py-0.5 text-[10px] font-medium truncate hover:bg-amber-200 transition-colors block"
               >
                 Padel
-              </div>
+              </button>
             ))}
-            {courseActivitiesForDay.map(activity => (
-              <div
-                key={`course-${activity._id}-${dateKey}`}
-                onClick={e => {
-                  e.stopPropagation();
-                  handleActivityClick('course', activity);
-                }}
-                className="bg-purple-100 text-purple-800 rounded-md px-2 py-1 text-xs font-medium truncate hover:bg-purple-200 transition-colors duration-200 cursor-pointer"
+            {dayCourse.map(a => (
+              <button
+                key={a._id}
+                onClick={e => { e.stopPropagation(); setSelectedActivity({ type: 'course', activity: a }); }}
+                className="w-full text-left bg-violet-100 text-violet-700 rounded px-1.5 py-0.5 text-[10px] font-medium truncate hover:bg-violet-200 transition-colors block"
               >
                 Course
-              </div>
+              </button>
             ))}
-            {natationActivitiesForDay.map(activity => (
-              <div
-                key={`natation-${activity._id}-${dateKey}`}
-                onClick={e => {
-                  e.stopPropagation();
-                  handleActivityClick('natation', activity);
-                }}
-                className="bg-yellow-100 text-yellow-800 rounded-md px-2 py-1 text-xs font-medium truncate hover:bg-yellow-200 transition-colors duration-200 cursor-pointer"
+            {dayNatation.map(a => (
+              <button
+                key={a._id}
+                onClick={e => { e.stopPropagation(); setSelectedActivity({ type: 'natation', activity: a }); }}
+                className="w-full text-left bg-sky-100 text-sky-700 rounded px-1.5 py-0.5 text-[10px] font-medium truncate hover:bg-sky-200 transition-colors block"
               >
                 Natation
-              </div>
+              </button>
             ))}
+            {dayGeneric.map(a => {
+              const sport = customSports.find(s => s.slug === a.sportSlug);
+              if (!sport) return null;
+              return (
+                <button
+                  key={a._id}
+                  onClick={e => { e.stopPropagation(); setSelectedActivity({ type: 'generic', activity: a, sport }); }}
+                  className="w-full text-left rounded px-1.5 py-0.5 text-[10px] font-medium truncate transition-colors block"
+                  style={{ backgroundColor: `${sport.color}20`, color: sport.color }}
+                >
+                  {sport.emoji} {sport.name}
+                </button>
+              );
+            })}
           </div>
         </div>
       );
@@ -354,66 +331,81 @@ export default function Calendar({ onDateSelect }: CalendarProps) {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-5xl">
-      <div className="flex justify-between items-center mb-6">
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
         <button
-          onClick={handlePrevMonth}
-          className="p-2 hover:bg-gray-100 rounded-full transition-colors duration-200"
+          onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1))}
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-6 w-6 text-gray-600"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 19l-7-7 7-7"
-            />
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <div className="flex items-center gap-4">
-          <span className="text-xl font-semibold text-gray-800">
-            {months[currentDate.getMonth()]}
-          </span>
+
+        <div className="flex items-center gap-3">
+          <h2 className="text-base font-semibold text-gray-900">
+            {MONTHS[currentDate.getMonth()]}
+          </h2>
           <select
             value={currentDate.getFullYear()}
-            onChange={handleYearChange}
-            className="border border-gray-200 rounded-lg px-3 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            onChange={e => setCurrentDate(new Date(parseInt(e.target.value), currentDate.getMonth()))}
+            className="text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400"
           >
-            {Array.from({ length: 10 }, (_, i) => currentDate.getFullYear() - 5 + i).map(year => (
-              <option key={year} value={year}>
-                {year}
-              </option>
+            {Array.from({ length: 10 }, (_, i) => currentDate.getFullYear() - 5 + i).map(y => (
+              <option key={y} value={y}>{y}</option>
             ))}
           </select>
         </div>
+
         <button
-          onClick={handleNextMonth}
-          className="p-2 hover:bg-gray-100 rounded-full transition-colors duration-200"
+          onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1))}
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-6 w-6 text-gray-600"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>
         </button>
       </div>
 
-      <div className="grid grid-cols-7 gap-px bg-gray-100">
-        {['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'].map(day => (
-          <div key={day} className="bg-white p-2 text-center text-sm font-medium text-gray-700">
-            {day}
+      {/* Day labels */}
+      <div className="grid grid-cols-7 px-3 pt-3 pb-1">
+        {DAYS.map(d => (
+          <div key={d} className="text-center text-[11px] font-semibold text-gray-400 pb-2">
+            {d}
           </div>
         ))}
-        {renderCalendarDays()}
+      </div>
+
+      {/* Calendar grid */}
+      <div className="px-3 pb-3">
+        {loading ? (
+          <div className="grid grid-cols-7 gap-1.5">
+            {Array.from({ length: 35 }).map((_, i) => (
+              <div key={i} className="h-24 md:h-28 rounded-xl bg-gray-50 animate-pulse" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-7 gap-1.5">
+            {renderCalendarDays()}
+          </div>
+        )}
+      </div>
+
+      {/* Legend */}
+      <div className="px-5 py-3 border-t border-gray-100 flex flex-wrap gap-3">
+        {Object.entries(SPORT_CONFIG).map(([key, cfg]) => (
+          <div key={key} className="flex items-center gap-1.5">
+            <div className={`w-2 h-2 rounded-full ${cfg.dot}`} />
+            <span className="text-xs text-gray-500">{cfg.label}</span>
+          </div>
+        ))}
+        {customSports.map(sport => (
+          <div key={sport._id} className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: sport.color }} />
+            <span className="text-xs text-gray-500">{sport.name}</span>
+          </div>
+        ))}
       </div>
 
       {selectedActivity && renderActivityDetails()}

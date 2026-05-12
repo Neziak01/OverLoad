@@ -1,77 +1,70 @@
 'use client';
-
 import { MusculationActivity } from '@/types/musculation';
 
-interface MusculationActivityListProps {
+interface Props {
   activities: MusculationActivity[];
   onDelete?: (id: string) => void;
 }
 
-export default function MusculationActivityList({
-  activities,
-  onDelete,
-}: MusculationActivityListProps) {
+export default function MusculationActivityList({ activities, onDelete }: Props) {
   if (activities.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">Aucune séance de musculation enregistrée</div>
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
+        <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-3">
+          <svg className="w-6 h-6 text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" strokeLinecap="round">
+            <path d="M7 12h10M5 9.5v5M19 9.5v5M3 10.5v3M21 10.5v3" />
+          </svg>
+        </div>
+        <p className="text-sm text-gray-500">Aucune séance enregistrée</p>
+        <p className="text-xs text-gray-400 mt-1">Ajoutez votre première séance de musculation</p>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {activities.map(activity => (
         <div
           key={activity._id}
-          className="bg-white rounded-lg shadow p-4 hover:shadow-md transition-shadow duration-200"
+          className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:shadow-md hover:border-emerald-100 transition-all duration-200"
         >
-          <div className="flex justify-between items-start mb-4">
+          <div className="flex items-start justify-between mb-3">
             <div>
-              <h3 className="text-lg font-semibold text-gray-800">
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 rounded-full px-2.5 py-0.5">
+                  Musculation
+                </span>
+                <span className="text-xs text-gray-400">
+                  {activity.exercices.length} exercice{activity.exercices.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <p className="text-sm font-semibold text-gray-900 capitalize">
                 {new Date(activity.date).toLocaleDateString('fr-FR', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
+                  weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
                 })}
-              </h3>
+              </p>
             </div>
             {onDelete && (
               <button
                 onClick={() => onDelete(activity._id)}
-                className="text-red-500 hover:text-red-700 transition-colors duration-200"
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                    clipRule="evenodd"
-                  />
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
                 </svg>
               </button>
             )}
           </div>
 
-          <div className="space-y-3">
-            {activity.exercices.map((exercice, exerciceIndex) => (
-              <div
-                key={`${activity._id}-exercice-${exercice.nom}-${exerciceIndex}`}
-                className="bg-gray-50 p-3 rounded-lg"
-              >
-                <h4 className="font-medium text-gray-800 mb-2">{exercice.nom}</h4>
-                <div className="space-y-1">
-                  {exercice.series.map((serie, serieIndex) => (
-                    <p
-                      key={`${activity._id}-serie-${exercice.nom}-${serieIndex}`}
-                      className="text-sm text-gray-600"
-                    >
-                      Série {serieIndex + 1}: {serie.repetitions} répétitions
-                      {serie.poids ? ` - ${serie.poids}kg` : ''}
-                    </p>
+          <div className="space-y-2">
+            {activity.exercices.map((ex, i) => (
+              <div key={i} className="bg-gray-50 rounded-xl px-3 py-2.5">
+                <p className="text-sm font-semibold text-gray-800">{ex.nom}</p>
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {ex.series.map((s, j) => (
+                    <span key={j} className="text-xs bg-white border border-gray-200 rounded-lg px-2 py-1 text-gray-600">
+                      {s.repetitions} rép.{s.poids ? ` × ${s.poids} kg` : ''}
+                    </span>
                   ))}
                 </div>
               </div>
@@ -79,9 +72,9 @@ export default function MusculationActivityList({
           </div>
 
           {activity.notes && (
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <p className="text-sm text-gray-600">{activity.notes}</p>
-            </div>
+            <p className="mt-3 text-xs text-gray-500 border-t border-gray-100 pt-3 italic">
+              {activity.notes}
+            </p>
           )}
         </div>
       ))}

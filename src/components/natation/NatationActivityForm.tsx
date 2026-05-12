@@ -1,195 +1,138 @@
 'use client';
-
 import { useState } from 'react';
 import { NatationActivity, Nage, TypeNage } from '@/types/natation';
 
-interface NatationActivityFormProps {
+interface Props {
   onSubmit: (activity: Omit<NatationActivity, '_id'>) => void;
 }
 
-export default function NatationActivityForm({ onSubmit }: NatationActivityFormProps) {
-  const [formData, setFormData] = useState({
-    date: '',
-    notes: '',
+const INPUT = 'block w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 transition-colors';
+const LABEL = 'block text-sm font-medium text-gray-700 mb-1.5';
+
+const NAGE_LABELS: Record<TypeNage, string> = {
+  crawl: 'Crawl',
+  brasse: 'Brasse',
+  dos: 'Dos crawlé',
+  papillon: 'Papillon',
+  '4nages': '4 Nages',
+};
+
+export default function NatationActivityForm({ onSubmit }: Props) {
+  const [date, setDate] = useState('');
+  const [notes, setNotes] = useState('');
+  const [nages, setNages] = useState<Nage[]>([]);
+  const [currentNage, setCurrentNage] = useState<{ type: TypeNage; distance: string }>({
+    type: 'crawl',
+    distance: '',
   });
 
-  const [nages, setNages] = useState<Nage[]>([]);
-  const [currentNage, setCurrentNage] = useState<Omit<Nage, '_id'>>({
-    type: 'crawl',
-    distance: 0,
-  });
+  const addNage = () => {
+    if (!currentNage.distance || parseFloat(currentNage.distance) <= 0) return;
+    setNages(prev => [...prev, {
+      _id: Date.now().toString(),
+      type: currentNage.type,
+      distance: parseFloat(currentNage.distance),
+    }]);
+    setCurrentNage(prev => ({ ...prev, distance: '' }));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (nages.length === 0) {
-      alert('Veuillez ajouter au moins une nage');
-      return;
-    }
-    onSubmit({
-      date: formData.date,
-      nages,
-      notes: formData.notes,
-    });
-    setFormData({
-      date: '',
-      notes: '',
-    });
-    setNages([]);
-    setCurrentNage({
-      type: 'crawl',
-      distance: 0,
-    });
+    if (nages.length === 0) return;
+    onSubmit({ date, nages, notes });
+    setDate(''); setNotes(''); setNages([]);
+    setCurrentNage({ type: 'crawl', distance: '' });
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleNageChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setCurrentNage(prev => ({
-      ...prev,
-      [name]: name === 'distance' ? Number(value) : value,
-    }));
-  };
-
-  const addNage = () => {
-    if (!currentNage.distance) {
-      alert('Veuillez entrer une distance');
-      return;
-    }
-    setNages(prev => [...prev, { ...currentNage, _id: Date.now().toString() }]);
-    setCurrentNage({
-      type: 'crawl',
-      distance: 0,
-    });
-  };
-
-  const removeNage = (_id: string) => {
-    setNages(prev => prev.filter(nage => nage._id !== _id));
-  };
+  const totalDistance = nages.reduce((sum, n) => sum + n.distance, 0);
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 bg-white p-6 rounded-lg shadow">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label htmlFor="date" className="block text-sm font-medium text-gray-700">
-          Date
-        </label>
-        <input
-          type="date"
-          id="date"
-          name="date"
-          value={formData.date}
-          onChange={handleChange}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-          required
-        />
+        <label className={LABEL}>Date</label>
+        <input type="date" value={date} onChange={e => setDate(e.target.value)} className={INPUT} required />
       </div>
 
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium text-gray-900">Nages</h3>
+      <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-3">
+        <p className="text-sm font-semibold text-gray-800">Nages</p>
 
-        <div className="flex gap-4">
+        <div className="flex gap-2">
           <div className="flex-1">
-            <label htmlFor="type" className="block text-sm font-medium text-gray-700">
-              Type de nage
-            </label>
+            <label className={LABEL}>Style</label>
             <select
-              id="type"
-              name="type"
               value={currentNage.type}
-              onChange={handleNageChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              onChange={e => setCurrentNage(prev => ({ ...prev, type: e.target.value as TypeNage }))}
+              className={INPUT}
             >
-              <option value="crawl">Crawl</option>
-              <option value="brasse">Brasse</option>
-              <option value="dos">Dos</option>
-              <option value="papillon">Papillon</option>
-              <option value="4nages">4 Nages</option>
+              {Object.entries(NAGE_LABELS).map(([val, label]) => (
+                <option key={val} value={val}>{label}</option>
+              ))}
             </select>
           </div>
-
           <div className="flex-1">
-            <label htmlFor="distance" className="block text-sm font-medium text-gray-700">
-              Distance (mètres)
-            </label>
+            <label className={LABEL}>Distance (m)</label>
             <input
               type="number"
-              id="distance"
-              name="distance"
               value={currentNage.distance}
-              onChange={handleNageChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              onChange={e => setCurrentNage(prev => ({ ...prev, distance: e.target.value }))}
               placeholder="100"
+              min="1"
+              className={INPUT}
             />
           </div>
-
           <button
             type="button"
             onClick={addNage}
-            className="mt-6 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+            className="h-[42px] px-3 mt-7 rounded-xl bg-sky-100 text-sky-700 text-sm font-semibold hover:bg-sky-200 transition-colors whitespace-nowrap"
           >
-            Ajouter
+            + Ajouter
           </button>
         </div>
 
         {nages.length > 0 && (
-          <div className="mt-4 space-y-2">
+          <div className="space-y-1.5">
             {nages.map(nage => (
-              <div
-                key={nage._id}
-                className="flex items-center justify-between bg-gray-50 p-2 rounded"
-              >
-                <span>
-                  {nage.type.charAt(0).toUpperCase() + nage.type.slice(1)}
-                  {nage.distance ? ` - ${nage.distance}m` : ''}
-                </span>
+              <div key={nage._id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-gray-100">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-sky-400" />
+                  <span className="text-sm text-gray-700 capitalize">
+                    {NAGE_LABELS[nage.type]} — <span className="font-semibold text-sky-600">{nage.distance} m</span>
+                  </span>
+                </div>
                 <button
                   type="button"
-                  onClick={() => removeNage(nage._id)}
-                  className="text-red-600 hover:text-red-800"
+                  onClick={() => setNages(prev => prev.filter(n => n._id !== nage._id))}
+                  className="text-gray-400 hover:text-red-500 transition-colors"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                      clipRule="evenodd"
-                    />
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
             ))}
+            <div className="flex items-center justify-between px-3 py-2 bg-sky-50 rounded-lg border border-sky-100">
+              <span className="text-xs font-medium text-sky-600">Total</span>
+              <span className="text-sm font-bold text-sky-700">{totalDistance} m</span>
+            </div>
           </div>
         )}
       </div>
 
       <div>
-        <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
-          Notes
-        </label>
+        <label className={LABEL}>Notes (optionnel)</label>
         <textarea
-          id="notes"
-          name="notes"
-          value={formData.notes}
-          onChange={handleChange}
-          rows={4}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          rows={3}
           placeholder="Commentaires sur votre séance..."
+          className={INPUT + ' resize-none'}
         />
       </div>
 
       <button
         type="submit"
-        className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        disabled={nages.length === 0}
+        className="w-full rounded-xl bg-sky-600 py-3 text-sm font-semibold text-white hover:bg-sky-700 active:scale-[0.98] transition-all shadow-sm shadow-sky-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         Enregistrer la séance
       </button>
